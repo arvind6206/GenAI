@@ -1,10 +1,11 @@
 import * as readline from "node:readline/promises";
-import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
+import { MemorySaver, StateGraph, MessagesAnnotation } from "@langchain/langgraph";
 import { HumanMessage } from "@langchain/core/messages";
 import { ChatGroq } from "@langchain/groq"
 import dotenv from 'dotenv'
 dotenv.config()
 import {ToolNode} from '@langchain/langgraph/prebuilt'
+import {TavilySearch} from '@langchain/tavily'
 
 
 /*
@@ -13,9 +14,20 @@ import {ToolNode} from '@langchain/langgraph/prebuilt'
 3. Compile and invoke the graph
  */
 
+//memory
+const checkPointer = new MemorySaver()
+
+
+//taveli
+
+const tool = new TavilySearch({
+    maxResults: 2,
+    topic: 'general'
+})
+
 
 //initialize the toolnode
-const tools = []
+const tools = [tool]
 const toolNode = new ToolNode(tools)
 
 //initialize llm
@@ -24,7 +36,7 @@ const llm = new ChatGroq({
     temperature: 0,
     maxTokens: undefined,
     maxRetries: 2
-})
+}).bindTools(tools)
 
 
 async function callModel(state) {
@@ -37,8 +49,11 @@ async function callModel(state) {
 }
 
 function shouldContinue(state){
-    
-    return '__end__'
+    const lastMessage = state.messages[state.messages.length - 1]
+    if(lastMessage.tool_calls.length > 0){
+        return 'tools'
+    }
+    return "__end__"
 }
 
 //build the graph
@@ -46,12 +61,12 @@ function shouldContinue(state){
 const workFlow = new StateGraph(MessagesAnnotation)
     .addNode("agent", callModel)
     .addEdge("__start__", "agent")
-    .addEdge("agent", "__end__")
+    .addEdge("tools", "agent")
     .addNode("tools",toolNode )
     .addConditionalEdges("agent", shouldContinue)
 
 //compile the graph
-const app = workFlow.compile()
+const app = workFlow.compile({checkpointer: checkPointer})
 
 
 async function main() {
@@ -65,8 +80,9 @@ async function main() {
     if (userInput === "/bye") break;
 
     const finalState = await app.invoke({
-        messages: [{role: 'user', content: userInput}]
-    })
+        messages: [{role: 'user', content: userInput}],
+
+    }, {configurable: { thread_id: "1" }})
     const lastMessage = finalState.messages[finalState.messages.length - 1]
     console.log("AI: ", lastMessage.content);
   }
