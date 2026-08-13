@@ -6,27 +6,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// ==============================
-// Environment Variables
-// ==============================
-
-const {
-  GEMINI_API_KEY,
-  PINECONE_API_KEY,
-  PINECONE_INDEX_NAME,
-} = process.env;
-
-if (!GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is missing");
-}
-
-if (!PINECONE_API_KEY) {
-  throw new Error("PINECONE_API_KEY is missing");
-}
-
-if (!PINECONE_INDEX_NAME) {
-  throw new Error("PINECONE_INDEX_NAME is missing");
-}
 
 
 
@@ -88,10 +67,6 @@ async function createChunks(documents) {
 }
 
 
-// ==============================
-// Generate Embedding
-// ==============================
-
 async function generateEmbedding(text) {
   const result = await ai.models.embedContent({
     model: EMBEDDING_MODEL,
@@ -151,10 +126,6 @@ async function createVectors(chunks) {
 }
 
 
-// ==============================
-// Upload to Pinecone
-// ==============================
-
 async function uploadToPinecone(vectors) {
   console.log("Uploading vectors to Pinecone...");
 
@@ -168,24 +139,17 @@ async function uploadToPinecone(vectors) {
 }
 
 
-// ==============================
-// Main Function
-// ==============================
 
 async function indexDocument() {
   try {
     console.log("Starting document indexing...\n");
 
-    // 1. Load PDF
     const documents = await loadPDF();
 
-    // 2. Split into chunks
     const chunks = await createChunks(documents);
 
-    // 3. Generate embeddings
     const vectors = await createVectors(chunks);
 
-    // 4. Upload to Pinecone
     await uploadToPinecone(vectors);
 
     console.log(
